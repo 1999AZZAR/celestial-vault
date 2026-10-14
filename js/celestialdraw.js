@@ -415,7 +415,17 @@
     var raMin = Math.floor(rng() * 60);
     var raSec = Math.floor(rng() * 60);
     var decDeg = (rng() > 0.35 ? "+" : "-") + Math.floor(rng() * 88);
-    var decMin = Math.floor(rng() * 60);
+    var DESCRIPTORS = [
+      "Boreal planisphere of stellar asterisms & radiant nodes",
+      "Austral circumpolar planisphere & astrolabe meridian grid",
+      "Equatorial stellar coordinate sphere & ecliptic alignment",
+      "Ptolemaic fixed-star catalog with Bayer Greek magnitudes",
+      "Hevelian celestial hemisphere & diffraction crosshairs",
+      "Urano-graphic astrometric projection & precession arc",
+      "Zodiacal nodal coordinates & equatorial hour circles",
+      "Sidereus Nuncius star field & telescopic asterism cluster"
+    ];
+    var meaning = DESCRIPTORS[Math.floor(rng() * DESCRIPTORS.length)];
 
     var metrics = {
       narrative: rawSeed,
@@ -423,6 +433,7 @@
       accessionId: accessionId,
       hashHex: "0x" + hexHash,
       constellation: constellationName,
+      meaning: meaning,
       epoch: "J" + precessionEpochYear + ".0",
       coordinates: raHours + "h " + raMin + "m " + raSec + "s / " + decDeg + "° " + decMin + "'",
       alphaMagnitude: alphaStar.mag.toFixed(2) + " mag",
