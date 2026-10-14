@@ -103,9 +103,10 @@
         .ratio-btn, .palette-chip {
             border: 1px solid var(--archival-muted);
             transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            cursor: pointer;
         }
-        .ratio-btn:hover { border-color: var(--archival-accent); color: var(--archival-accent); }
-        .ratio-btn[data-active="true"] {
+        .ratio-btn:hover, .palette-chip:hover { border-color: var(--archival-accent); color: var(--archival-accent); }
+        .ratio-btn[data-active="true"], .palette-chip[data-active="true"] {
             background: var(--archival-accent);
             color: var(--archival-surface);
             border-color: var(--archival-accent);
@@ -733,14 +734,13 @@
 
             // Recover from ID
             DOM.idLoadInput.addEventListener('input', () => {
-                const val = DOM.idLoadInput.value.trim();
-                if (val.length >= 6) {
-                    DOM.seedInput.value = val;
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => {
-                        synthesizeSpecimen();
-                    }, 350);
+                if (DOM.idLoadInput.value.trim().length > 0) {
+                    DOM.seedInput.value = '';
                 }
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    synthesizeSpecimen();
+                }, 350);
             });
 
             // Clipboard Copy Helper
@@ -903,26 +903,29 @@
                 DOM.pngBtn.click();
             });
 
-            // URL Search Params Initialization
+            // URL Search Params & Embed Mode Initialization
             const params = new URLSearchParams(window.location.search);
             if (params.get('mode') === 'embed') {
                 document.body.dataset.mode = 'embed';
             }
-            if (params.get('narrative') || params.get('seed')) {
-                DOM.seedInput.value = params.get('narrative') || params.get('seed');
+            if (params.get('narrative') || params.get('seed') || params.get('s')) {
+                DOM.seedInput.value = params.get('narrative') || params.get('seed') || params.get('s');
+                DOM.idLoadInput.value = '';
             }
             if (params.get('id')) {
                 DOM.idLoadInput.value = params.get('id');
                 DOM.seedInput.value = '';
             }
-            if (params.get('palette')) {
-                STATE.currentPalette = params.get('palette');
+            const paletteParam = params.get('palette') || params.get('color');
+            if (paletteParam && window.CelestialDraw && window.CelestialDraw.PALETTES && window.CelestialDraw.PALETTES[paletteParam]) {
+                STATE.currentPalette = paletteParam;
                 DOM.paletteBtns.forEach(b => {
-                    b.classList.remove('border-2', 'border-[#8B1A1A]');
-                    if (b.dataset.palette === STATE.currentPalette) {
-                        b.classList.add('border-2', 'border-[#8B1A1A]');
-                    }
+                    if (b.dataset.palette === STATE.currentPalette) b.setAttribute('data-active', 'true');
+                    else b.removeAttribute('data-active');
                 });
+                if (DOM.paletteActiveLabel) {
+                    DOM.paletteActiveLabel.textContent = STATE.currentPalette.toUpperCase();
+                }
             }
             if (params.get('w') && params.get('h')) {
                 const targetW = params.get('w');
@@ -935,6 +938,41 @@
                     }
                 });
             }
+
+            // PostMessage & Embed Mode Integration
+            window.addEventListener('message', (event) => {
+                const data = event.data;
+                if (!data || typeof data !== 'object') return;
+
+                if (data.narrative || data.seed) {
+                    DOM.seedInput.value = data.narrative || data.seed;
+                    DOM.idLoadInput.value = '';
+                }
+                if (data.id) {
+                    DOM.idLoadInput.value = data.id;
+                    DOM.seedInput.value = '';
+                }
+                if (data.palette && window.CelestialDraw && window.CelestialDraw.PALETTES && window.CelestialDraw.PALETTES[data.palette]) {
+                    STATE.currentPalette = data.palette;
+                    DOM.paletteBtns.forEach(b => {
+                        if (b.dataset.palette === STATE.currentPalette) b.setAttribute('data-active', 'true');
+                        else b.removeAttribute('data-active');
+                    });
+                    if (DOM.paletteActiveLabel) {
+                        DOM.paletteActiveLabel.textContent = STATE.currentPalette.toUpperCase();
+                    }
+                }
+                if (data.w && data.h) {
+                    DOM.ratioBtns.forEach(btn => {
+                        if (btn.dataset.w == data.w && btn.dataset.h == data.h) {
+                            DOM.ratioBtns.forEach(b => b.removeAttribute('data-active'));
+                            btn.setAttribute('data-active', 'true');
+                            STATE.currentRatio = { w: parseInt(data.w, 10), h: parseInt(data.h, 10) };
+                        }
+                    });
+                }
+                synthesizeSpecimen();
+            });
 
             // Synthesize initial specimen on boot
             synthesizeSpecimen();
