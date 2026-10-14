@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  celestial-vault:
+    build: .
+    container_name: celestial-vault
+    ports:
+      - "8089:80"
+    restart: unless-stopped

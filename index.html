@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Celestial Vault | Archival Astrometry & Planisphere Engine</title>
+    <meta name="description" content="Archival astrometry, procedural celestial planispheres, constellation asterisms, and vector star charts adhering to the Swiss-Archival standard.">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="https://celestial-vault.glassgallery.my.id/">
+    
+    <!-- Open Graph & Twitter Cards -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Celestial Vault">
+    <meta property="og:title" content="Celestial Vault | Archival Astrometry & Planisphere Engine">
+    <meta property="og:description" content="Deterministic procedural celestial planisphere archive and vector star chart synthesis engine adhering to the Swiss-Archival standard.">
+    <meta property="og:url" content="https://celestial-vault.glassgallery.my.id/">
+    <meta property="og:image" content="https://celestial-vault.glassgallery.my.id/icon-512.svg">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Celestial Vault | Archival Astrometry & Planisphere Engine">
+    <meta name="twitter:description" content="Procedural celestial star charts, constellation asterisms, and stereographic planispheres.">
+    <meta name="twitter:image" content="https://celestial-vault.glassgallery.my.id/icon-512.svg">
+
+    <!-- PWA & Favicons -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <meta name="theme-color" content="#E8E0D0">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        :root {
+            --archival-bg: #E8E0D0;
+            --archival-fg: #2A2520;
+            --archival-surface: #EFE9DC;
+            --archival-accent: #8B1A1A;
+            --archival-muted: #DDD5C5;
+            --archival-meta: #7A7068;
+            --grid-color: rgba(191, 182, 166, 0.2);
+        }
+
+        ::selection { background: var(--archival-accent); color: var(--archival-surface); }
+
+        body { 
+            background-color: var(--archival-bg); 
+            background-image: linear-gradient(to right, var(--grid-color) 1px, transparent 1px);
+            background-size: 10% 100%;
+            color: var(--archival-fg); 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .noise-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.04;
+            mix-blend-mode: multiply;
+        }
+
+        .font-tech { 
+            font-family: 'JetBrains Mono', monospace; 
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .surface-card { 
+            background: var(--archival-surface); 
+            border: 1px solid var(--archival-muted); 
+            box-shadow: 0 4px 24px -12px rgba(42, 37, 32, 0.08);
+        }
+
+        input {
+            background: var(--archival-bg);
+            border: 1px solid var(--archival-muted);
+            color: var(--archival-fg);
+            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        input:focus { 
+            outline: none; 
+            border-color: var(--archival-accent); 
+        }
+
+        #render-target svg, #render-target canvas {
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            max-width: 95%;
+            max-height: 95%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            box-shadow: 0 6px 20px -8px rgba(42, 37, 32, 0.12);
+        }
+
+        /* Matrix Control Styling */
+        .ratio-btn, .palette-chip {
+            border: 1px solid var(--archival-muted);
+            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .ratio-btn:hover { border-color: var(--archival-accent); color: var(--archival-accent); }
+        .ratio-btn[data-active="true"] {
+            background: var(--archival-accent);
+            color: var(--archival-surface);
+            border-color: var(--archival-accent);
+        }
+
+        /* Interactive Hardware Cursor */
+        .custom-cursor, .custom-cursor-trail {
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            border-radius: 50%;
+            z-index: 9999;
+            transform: translate3d(calc(var(--x, -100px) - 50%), calc(var(--y, -100px) - 50%), 0) scale(var(--scale, 1));
+            will-change: transform;
+            display: none;
+        }
+        @media (pointer: fine) {
+            .custom-cursor, .custom-cursor-trail { display: block; }
+        }
+        .custom-cursor {
+            width: 6px;
+            height: 6px;
+            background-color: var(--archival-accent);
+            transition: transform 0.1s ease-out;
+        }
+        .custom-cursor-trail {
+            width: 24px;
+            height: 24px;
+            border: 1px solid var(--archival-accent);
+            opacity: 0.35;
+            transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s ease;
+        }
+        .custom-cursor.hover { --scale: 1.5; }
+        .custom-cursor-trail.hover { --scale: 1.5; background-color: rgba(139, 26, 26, 0.08); opacity: 0.8; }
+
+        /* Fullscreen Viewer */
+        #fullscreen-btn {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            cursor: pointer !important;
+            z-index: 30;
+        }
+        .group:hover #fullscreen-btn { opacity: 1; }
+
+        #fullscreen-viewer.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Embed Mode */
+        body[data-mode="embed"] { 
+            background: transparent !important;
+            padding: 0 !important; 
+            margin: 0 !important;
+            overflow: hidden !important;
+        }
+        body[data-mode="embed"] .custom-cursor,
+        body[data-mode="embed"] .custom-cursor-trail,
+        body[data-mode="embed"] .noise-layer,
+        body[data-mode="embed"] #fullscreen-viewer,
+        body[data-mode="embed"] #fullscreen-btn,
+        body[data-mode="embed"] section,
+        body[data-mode="embed"] footer,
+        body[data-mode="embed"] #docs-section {
+            display: none !important;
+        }
+        body[data-mode="embed"] main {
+            max-width: none !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        body[data-mode="embed"] .surface-card {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            padding: 0 !important;
+        }
+        body[data-mode="embed"] #render-target svg {
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8">
+
+    <div class="custom-cursor" aria-hidden="true"></div>
+    <div class="custom-cursor-trail" aria-hidden="true"></div>
+
+    <svg class="noise-layer" aria-hidden="true">
+        <filter id="fractalNoise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+        </filter>
+        <rect width="100%" height="100%" filter="url(#fractalNoise)"/>
+    </svg>
+
+    <!-- Fullscreen Viewer Modal -->
+    <div id="fullscreen-viewer" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-[#2A2520] bg-opacity-95 backdrop-blur-sm cursor-pointer"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-8 pointer-events-none">
+            <div class="relative w-full h-full max-w-7xl max-h-[90vh] flex flex-col pointer-events-auto">
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <div class="flex items-center gap-4">
+                        <span id="viewer-title" class="font-tech text-[12px] text-[#E8E0D0]">SPECIMEN VIEWER</span>
+                        <span id="viewer-seq" class="font-tech text-[10px] text-[#7A7068]"></span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="viewer-download-svg" class="font-tech text-[10px] text-[#E8E0D0] hover:text-[#8B1A1A] transition-all flex items-center gap-2 px-3 py-2 border border-[#7A7068] hover:border-[#8B1A1A] bg-[#2A2520] cursor-pointer">
+                            <i class="fa-solid fa-code"></i> SVG
+                        </button>
+                        <button id="viewer-download-png" class="font-tech text-[10px] text-[#E8E0D0] hover:text-[#8B1A1A] transition-all flex items-center gap-2 px-3 py-2 border border-[#7A7068] hover:border-[#8B1A1A] bg-[#2A2520] cursor-pointer">
+                            <i class="fa-solid fa-download"></i> PNG
+                        </button>
+                        <button id="viewer-close" class="font-tech text-[10px] text-[#E8E0D0] hover:text-[#8B1A1A] transition-all flex items-center gap-2 px-3 py-2 border border-[#7A7068] hover:border-[#8B1A1A] bg-[#2A2520] cursor-pointer">
+                            <i class="fa-solid fa-times"></i> CLOSE
+                        </button>
+                    </div>
+                </div>
+                <div id="viewer-content" class="flex-1 flex items-center justify-center bg-[#EFE9DC] rounded-sm border border-[#7A7068] overflow-hidden">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embed Code Modal -->
+    <div id="embed-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="surface-card p-6 rounded-sm max-w-lg w-full space-y-4 border border-[var(--archival-muted)]">
+            <div class="flex items-center justify-between border-b border-[var(--archival-muted)] pb-3">
+                <span class="font-tech text-[11px] font-bold text-[var(--archival-fg)] flex items-center gap-2">
+                    <i class="fa-solid fa-code text-xs text-[var(--archival-accent)]"></i> EMBED_IFRAME_SNIPPET
+                </span>
+                <button id="embed-modal-close" class="font-tech text-[10px] text-[var(--archival-meta)] hover:text-[var(--archival-accent)]">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <textarea id="embed-modal-textarea" readonly rows="4" class="w-full font-tech text-[10px] p-3 bg-[var(--archival-bg)] border border-[var(--archival-muted)] resize-none text-[var(--archival-fg)] focus:outline-none"></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="embed-modal-copy-btn" class="font-tech text-[10px] px-3 py-1.5 border border-[var(--archival-muted)] bg-[var(--archival-surface)] hover:border-[var(--archival-accent)] transition-all">
+                    <i class="fa-solid fa-copy"></i> [ COPY SNIPPET ]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="max-w-[80rem] w-full space-y-6 relative z-10 grid grid-cols-1 md:grid-cols-5 gap-6">
+        
+        <!-- Left: Specimen Plate Viewport (Col 1-3) -->
+        <div id="specimen-viewport-card" class="surface-card w-full aspect-square md:aspect-auto md:h-full md:col-span-3 rounded-sm p-8 overflow-hidden relative group">
+            
+            <!-- Drafting Dot Matrix -->
+            <div class="drafting-dots absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMTIyLCAxMTIsIDEwNCwgMC4xKSIvPjwvc3ZnPg==')] opacity-80 pointer-events-none"></div>
+
+            <button id="fullscreen-btn" class="absolute top-4 right-4 font-tech text-[10px] text-[#2A2520] hover:text-[#8B1A1A] flex items-center justify-center gap-2 px-3 py-2 border border-[#DDD5C5] hover:border-[#8B1A1A] bg-[#EFE9DC] z-10 transition-all">
+                <i class="fa-solid fa-expand"></i> [ EXPAND ]
+            </button>
+
+            <!-- Specimen Display Target -->
+            <div id="render-target" class="w-full h-full flex items-center justify-center">
+                <div class="font-tech text-[10px] text-[#7A7068] flex items-center gap-2">
+                    <i class="fa-solid fa-circle-notch fa-spin text-[#8B1A1A]"></i> COMPUTING ASTROMETRIC PROJECTION...
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Control Matrix (Col 4-5) -->
+        <section class="surface-card p-6 rounded-sm space-y-6 md:col-span-2 flex flex-col justify-between">
+            <div class="space-y-6">
+                <header class="flex items-center justify-between border-b border-[#DDD5C5] pb-4">
+                    <h1 class="font-tech text-[11px] font-semibold text-[#2A2520] flex items-center gap-2">
+                        <i class="fa-solid fa-compass-drafting text-xs text-[#8B1A1A]"></i> Synthesis Engine
+                    </h1>
+                </header>
+
+                <!-- 1. Format Matrix (3x3 Numeric Ratios) -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-[#7A7068]">
+                        <span class="font-tech text-[9px] tracking-wider">01 // ASPECT_RATIO_MATRIX</span>
+                        <span class="font-tech text-[8px]">TARGET VIEW</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="9" data-h="16">9:16</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="2" data-h="3">2:3</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="3" data-h="4">3:4</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="4" data-h="5">4:5</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="1" data-h="1" data-active="true">1:1</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="5" data-h="4">5:4</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="4" data-h="3">4:3</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="3" data-h="2">3:2</button>
+                        <button class="ratio-btn font-tech text-[10px] py-2 bg-[#E8E0D0] text-[#2A2520]" data-w="16" data-h="9">16:9</button>
+                    </div>
+                </div>
+
+                <!-- 2. Seed Injection & ID Recovery -->
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-[#7A7068]">
+                            <span class="font-tech text-[9px] tracking-wider">02 // NARRATIVE_INJECTION_SEED</span>
+                            <button id="random-btn" class="font-tech text-[8px] hover:text-[#8B1A1A] transition-colors flex items-center gap-1 cursor-pointer">
+                                <i class="fa-solid fa-dice text-[9px]"></i> [ RANDOM NARRATIVE ]
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-tech text-[#7A7068] text-xs">>_</span>
+                            <input type="text" id="seed-input" class="font-tech text-[11px] w-full pl-8 pr-3 py-2" placeholder="Inject celestial epoch or coordinates..." value="Ptolemaic Planisphere of the Northern Stars">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-[#7A7068]">
+                            <span class="font-tech text-[8px] tracking-wider">RECOVER FROM ID</span>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#7A7068] text-xs">
+                                <i class="fa-solid fa-fingerprint"></i>
+                            </span>
+                            <input type="text" id="id-load-input" class="font-tech text-[11px] w-full pl-8 pr-3 py-1.5" placeholder="e.g. CSV-XX-XXXXXX">
+                        </div>
+                    </div>
+
+                    <!-- Archival Stellar Palette Swatches -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-[#7A7068]">
+                            <span class="font-tech text-[9px] tracking-wider">ARCHIVAL_STELLAR_PALETTE</span>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2" id="palette-matrix">
+                            <button class="palette-chip py-1.5 text-[8px] font-tech font-semibold bg-[#EFE9DC] text-[#2A2520] border-2 border-[#8B1A1A] flex flex-col items-center gap-1" data-palette="vellum">
+                                <span class="w-3.5 h-3.5 rounded-full border border-[#2A2520] bg-[#EFE9DC]"></span>
+                                VELLUM
+                            </button>
+                            <button class="palette-chip py-1.5 text-[8px] font-tech font-semibold bg-[#0D1B2A] text-[#E0E1DD] flex flex-col items-center gap-1" data-palette="cyanotype">
+                                <span class="w-3.5 h-3.5 rounded-full border border-[#E0E1DD] bg-[#0D1B2A]"></span>
+                                CYANOTYPE
+                            </button>
+                            <button class="palette-chip py-1.5 text-[8px] font-tech font-semibold bg-[#151413] text-[#ECE6DA] flex flex-col items-center gap-1" data-palette="obsidian">
+                                <span class="w-3.5 h-3.5 rounded-full border border-[#ECE6DA] bg-[#151413]"></span>
+                                OBSIDIAN
+                            </button>
+                            <button class="palette-chip py-1.5 text-[8px] font-tech font-semibold bg-[#111422] text-[#E2E8F0] flex flex-col items-center gap-1" data-palette="indigo">
+                                <span class="w-3.5 h-3.5 rounded-full border border-[#E2E8F0] bg-[#111422]"></span>
+                                INDIGO
+                            </button>
+                            <button class="palette-chip py-1.5 text-[8px] font-tech font-semibold bg-[#F7F2E7] text-[#3D2B1F] flex flex-col items-center gap-1" data-palette="golden">
+                                <span class="w-3.5 h-3.5 rounded-full border border-[#3D2B1F] bg-[#F7F2E7]"></span>
+                                GOLDEN
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Astrometric Telemetry Matrix -->
+                <div class="space-y-3 pt-2">
+                    <div class="flex justify-between items-center text-[#7A7068] border-b border-[#DDD5C5] pb-2">
+                        <span class="font-tech text-[9px] tracking-wider">03 // CELESTIAL_TELEMETRY</span>
+                        <span id="accession-badge" class="font-tech text-[9px] text-[#8B1A1A] font-semibold">CSV-00-000000</span>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="text-[8px] font-tech text-[#7A7068]">ASTERISM CONSTELLATION NAME</div>
+                        <div id="tel-constellation" class="font-serif italic text-base text-[#2A2520] font-semibold leading-tight">Orion Borealis</div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-[9px] font-tech">
+                        <div>
+                            <span class="text-[#7A7068] block">CELESTIAL EPOCH</span>
+                            <span id="tel-epoch" class="text-[#2A2520] font-semibold">J2000.0</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">COORDINATES (RA / DEC)</span>
+                            <span id="tel-coords" class="text-[#2A2520] font-semibold">18h 36m / +38° 47'</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">ALPHA MAGNITUDE</span>
+                            <span id="tel-mag" class="text-[#2A2520] font-semibold">0.03 mag (Vega Class)</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">ASTERISM TOPOLOGY</span>
+                            <span id="tel-asterism" class="text-[#2A2520] font-semibold">8 Nodes (9 Rays)</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">CATALOG POPULATION</span>
+                            <span id="tel-population" class="text-[#2A2520] font-semibold">72 Cataloged Stars</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">PLANISPHERE PROJECTION</span>
+                            <span id="tel-projection" class="text-[#2A2520] font-semibold">Stereographic (1:60')</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">PRECESSION DRIFT</span>
+                            <span id="tel-precession" class="text-[#2A2520] font-semibold">+50.29" / Century</span>
+                        </div>
+                        <div>
+                            <span class="text-[#7A7068] block">PTR HASH / METRIC</span>
+                            <span id="tel-hash" class="text-[#2A2520] font-semibold">0x811C9DC5</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Export & Embedding Trigger Matrix -->
+            <div class="pt-4 border-t border-[#DDD5C5] space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="svg-btn" class="font-tech text-[10px] text-[#2A2520] hover:text-[#8B1A1A] py-2 px-3 border border-[#DDD5C5] hover:border-[#8B1A1A] transition-all flex items-center justify-center gap-2 cursor-pointer bg-[#EFE9DC]">
+                        <i class="fa-solid fa-code text-[9px]"></i> [ SVG FILE ]
+                    </button>
+                    <button id="png-btn" class="font-tech text-[10px] text-[#2A2520] hover:text-[#8B1A1A] py-2 px-3 border border-[#DDD5C5] hover:border-[#8B1A1A] transition-all flex items-center justify-center gap-2 cursor-pointer bg-[#EFE9DC]">
+                        <i class="fa-solid fa-download text-[9px]"></i> [ PNG 300DPI ]
+                    </button>
+                </div>
+                <button id="embed-btn" class="w-full font-tech text-[10px] text-[#7A7068] hover:text-[#2A2520] py-1.5 px-3 border border-dashed border-[#DDD5C5] hover:border-[#2A2520] transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-share-nodes text-[9px]"></i> [ EMBED_SPECIMEN ]
+                </button>
+            </div>
+        </section>
+
+        <!-- Technical Documentation Section -->
+        <article id="docs-section" class="surface-card p-6 md:p-8 rounded-sm space-y-6 md:col-span-5 border border-[#DDD5C5]">
+            <header class="border-b border-[#DDD5C5] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h2 class="font-tech text-[13px] font-bold text-[#2A2520] tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-book-open text-xs text-[#8B1A1A]"></i> TECHNICAL SPECIFICATION // CELESTIAL_VAULT
+                    </h2>
+                    <p class="text-xs text-[#7A7068] mt-1">Archival astrometry, stereographic planisphere projections, and procedural constellation asterism synthesis.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-tech text-[9px] px-2 py-0.5 bg-[#E8E0D0] border border-[#DDD5C5] text-[#7A7068]">SWISS-ARCHIVAL V1.0</span>
+                    <a href="/docs.html" class="font-tech text-[9px] px-2 py-0.5 border border-[#8B1A1A] text-[#8B1A1A] hover:bg-[#8B1A1A] hover:text-[#EFE9DC] transition-colors">FULL SPECS</a>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-[#2A2520]">
+                <div class="space-y-2">
+                    <h3 class="font-tech text-[10px] font-bold text-[#8B1A1A] tracking-wider">01 // ASTROMETRIC PROJECTION</h3>
+                    <p class="text-[#7A7068] leading-relaxed">
+                        The celestial engine renders stereographic planispheric projections modeled on historical Renaissance celestial globes (Hevelius, Bayer, Al-Sufi). Concentric declination rings (30°, 60°, 75°) intersect radial Right Ascension hour lines.
+                    </p>
+                </div>
+                <div class="space-y-2">
+                    <h3 class="font-tech text-[10px] font-bold text-[#8B1A1A] tracking-wider">02 // CONSTELLATION ASTERISMS</h3>
+                    <p class="text-[#7A7068] leading-relaxed">
+                        Star coordinates and magnitudes are derived deterministically via 32-bit FNV-1a hashing. Asterism branches are computed through minimum spanning tree algorithms with structural polygon loops, accompanied by Bayer Greek letter designations.
+                    </p>
+                </div>
+                <div class="space-y-2">
+                    <h3 class="font-tech text-[10px] font-bold text-[#8B1A1A] tracking-wider">03 // DRAFTING FRAMING & CHOP</h3>
+                    <p class="text-[#7A7068] leading-relaxed">
+                        Each plate incorporates dual Swiss-Archival drafting borders, an Astrometric Scale Bar (60' Arc Rule), a Cinnabar Vermilion Seal Chop (朱砂印章 · 星纬典藏), and an authentic Hershey simplex vector cursive Latin title.
+                    </p>
+                </div>
+            </div>
+        </article>
+
+        <!-- Footer -->
+        <footer class="md:col-span-5 text-center py-12">
+            <p class="font-tech text-[10px] text-[#7A7068]">CELESTIAL_VAULT &copy; 2026 | AZZAR_BUDIYANTO // ARCHIVAL ASTROMETRY ENGINE</p>
+        </footer>
+    </main>
+
+    <!-- Core Engine Scripts -->
+    <script src="js/celestialdraw.js?v=1.0.0"></script>
+    <script>
+        (function() {
+            const NARRATIVE_TOPICS = [
+                "Ptolemaic Planisphere of the Northern Stars",
+                "Hevelius Uranographia Constellation Study",
+                "Al-Sufi Book of Fixed Stars Astrolabe",
+                "Tycho Brahe Uraniborg Celestial Meridian",
+                "Dunhuang Star Chart Celestial Coordinates",
+                "Su Song Astronomical Water Clock Celestial Globe",
+                "Galilean Medicean Stars Sidereus Nuncius",
+                "Kepler Rudolphine Tables Planetary Ephemeris",
+                "Halley Southern Celestial Sphere Survey",
+                "Herschel Deep Sky Nebular Cluster Catalog",
+                "Bayer Uranometria Magnitude Mapping",
+                "Flamsteed Atlas Coelestis Greenwich Meridian",
+                "Islamic Brass Astrolabe Rete Coordinate Plate",
+                "Copernican Heliocentric Precessional Drift",
+                "Cassini Celestial Sphere Paris Observatory"
+            ];
+
+            const STATE = {
+                currentRatio: { w: 1, h: 1 },
+                currentPalette: 'vellum',
+                currentSpecimen: null,
+                currentSeed: 'Ptolemaic Planisphere of the Northern Stars'
+            };
+
+            const DOM = {
+                target: document.getElementById('render-target'),
+                seedInput: document.getElementById('seed-input'),
+                idLoadInput: document.getElementById('id-load-input'),
+                randomBtn: document.getElementById('random-btn'),
+                ratioBtns: document.querySelectorAll('.ratio-btn'),
+                paletteBtns: document.querySelectorAll('.palette-chip'),
+                accessionBadge: document.getElementById('accession-badge'),
+                fullscreenBtn: document.getElementById('fullscreen-btn'),
+                fullscreenViewer: document.getElementById('fullscreen-viewer'),
+                viewerContent: document.getElementById('viewer-content'),
+                viewerClose: document.getElementById('viewer-close'),
+                viewerTitle: document.getElementById('viewer-title'),
+                viewerSeq: document.getElementById('viewer-seq'),
+                viewerDownloadSvg: document.getElementById('viewer-download-svg'),
+                viewerDownloadPng: document.getElementById('viewer-download-png'),
+                svgBtn: document.getElementById('svg-btn'),
+                pngBtn: document.getElementById('png-btn'),
+                embedBtn: document.getElementById('embed-btn'),
+                embedModal: document.getElementById('embed-modal'),
+                embedModalTextarea: document.getElementById('embed-modal-textarea'),
+                embedModalClose: document.getElementById('embed-modal-close'),
+                embedModalCopyBtn: document.getElementById('embed-modal-copy-btn'),
+                // Telemetry Elements
+                telConstellation: document.getElementById('tel-constellation'),
+                telEpoch: document.getElementById('tel-epoch'),
+                telCoords: document.getElementById('tel-coords'),
+                telMag: document.getElementById('tel-mag'),
+                telAsterism: document.getElementById('tel-asterism'),
+                telPopulation: document.getElementById('tel-population'),
+                telProjection: document.getElementById('tel-projection'),
+                telPrecession: document.getElementById('tel-precession'),
+                telHash: document.getElementById('tel-hash'),
+                // Cursor
+                cursor: document.querySelector('.custom-cursor'),
+                cursorTrail: document.querySelector('.custom-cursor-trail')
+            };
+
+            // Custom Hardware-Accelerated Cursor Logic
+            if (DOM.cursor && DOM.cursorTrail) {
+                if (!window.matchMedia('(pointer: fine)').matches || document.body.dataset.mode === 'embed') {
+                    DOM.cursor.style.display = 'none';
+                    DOM.cursorTrail.style.display = 'none';
+                } else {
+                    let mouseX = -100, mouseY = -100;
+                    let trailX = -100, trailY = -100;
+
+                    window.addEventListener('mousemove', (e) => {
+                        mouseX = e.clientX;
+                        mouseY = e.clientY;
+                        DOM.cursor.style.setProperty('--x', `${mouseX}px`);
+                        DOM.cursor.style.setProperty('--y', `${mouseY}px`);
+                    });
+
+                    function renderCursorTrail() {
+                        trailX += (mouseX - trailX) * 0.25;
+                        trailY += (mouseY - trailY) * 0.25;
+                        DOM.cursorTrail.style.setProperty('--x', `${trailX}px`);
+                        DOM.cursorTrail.style.setProperty('--y', `${trailY}px`);
+                        requestAnimationFrame(renderCursorTrail);
+                    }
+                    requestAnimationFrame(renderCursorTrail);
+
+                    const interactiveEls = document.querySelectorAll('button, input, select, a');
+                    interactiveEls.forEach(el => {
+                        el.addEventListener('mouseenter', () => {
+                            DOM.cursor.classList.add('hover');
+                            DOM.cursorTrail.classList.add('hover');
+                        });
+                        el.addEventListener('mouseleave', () => {
+                            DOM.cursor.classList.remove('hover');
+                            DOM.cursorTrail.classList.remove('hover');
+                        });
+                    });
+                }
+            }
+
+            function getDimensions(ratio) {
+                const base = 600;
+                if (ratio.w >= ratio.h) {
+                    return { w: base, h: Math.round(base * (ratio.h / ratio.w)) };
+                } else {
+                    return { w: Math.round(base * (ratio.w / ratio.h)), h: base };
+                }
+            }
+
+            function synthesizeSpecimen() {
+                const idLoadVal = DOM.idLoadInput.value.trim();
+                let seedVal = DOM.seedInput.value.trim();
+                const dims = getDimensions(STATE.currentRatio);
+
+                let opts = {
+                    width: dims.w,
+                    height: dims.h,
+                    palette: STATE.currentPalette
+                };
+
+                if (idLoadVal && idLoadVal.includes('-')) {
+                    opts.id = idLoadVal;
+                    STATE.currentSeed = idLoadVal;
+                } else {
+                    seedVal = seedVal || 'Archival Astrometric Specimen';
+                    opts.narrative = seedVal;
+                    STATE.currentSeed = seedVal;
+                }
+
+                const specimen = window.CelestialDraw.synthesize(opts.narrative || opts.id, opts);
+                STATE.currentSpecimen = specimen;
+
+                // Update Telemetry Panel
+                DOM.accessionBadge.textContent = specimen.accessionId;
+                DOM.telConstellation.textContent = specimen.constellation;
+                DOM.telEpoch.textContent = specimen.metrics.epoch;
+                DOM.telCoords.textContent = specimen.metrics.coordinates;
+                DOM.telMag.textContent = specimen.metrics.alphaMagnitude;
+                DOM.telAsterism.textContent = specimen.metrics.asterismNodes;
+                DOM.telPopulation.textContent = specimen.metrics.starFieldPopulation;
+                DOM.telProjection.textContent = specimen.metrics.projection;
+                DOM.telPrecession.textContent = specimen.metrics.precessionRate;
+                DOM.telHash.textContent = specimen.metrics.hashHex;
+
+                renderViewport();
+
+                // Sync URL if not in embed mode
+                if (document.body.dataset.mode !== 'embed') {
+                    const url = new URL(window.location);
+                    if (idLoadVal && idLoadVal.includes('-')) {
+                        url.searchParams.set('id', idLoadVal);
+                        url.searchParams.delete('narrative');
+                        url.searchParams.delete('seed');
+                    } else {
+                        url.searchParams.set('narrative', seedVal);
+                        url.searchParams.delete('id');
+                    }
+                    url.searchParams.set('w', STATE.currentRatio.w);
+                    url.searchParams.set('h', STATE.currentRatio.h);
+                    url.searchParams.set('palette', STATE.currentPalette);
+                    window.history.replaceState({}, '', url);
+                }
+            }
+
+            function renderViewport() {
+                if (!STATE.currentSpecimen) return;
+                const dims = getDimensions(STATE.currentRatio);
+                const svgMarkup = window.CelestialDraw.generateSvgPlate(STATE.currentSpecimen, {
+                    width: dims.w,
+                    height: dims.h,
+                    palette: STATE.currentPalette
+                });
+
+                DOM.target.innerHTML = svgMarkup;
+                const svgEl = DOM.target.querySelector('svg');
+                if (svgEl) {
+                    svgEl.style.aspectRatio = `${dims.w} / ${dims.h}`;
+                    svgEl.classList.add('w-full', 'h-full', 'max-h-[500px]', 'object-contain', 'transition-all');
+                }
+            }
+
+            // Aspect Ratio Matrix Selection
+            DOM.ratioBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    DOM.ratioBtns.forEach(b => b.removeAttribute('data-active'));
+                    btn.setAttribute('data-active', 'true');
+                    STATE.currentRatio = {
+                        w: parseInt(btn.dataset.w, 10),
+                        h: parseInt(btn.dataset.h, 10)
+                    };
+                    synthesizeSpecimen();
+                });
+            });
+
+            // Palette Selection Matrix
+            DOM.paletteBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    DOM.paletteBtns.forEach(b => {
+                        b.classList.remove('border-2', 'border-[#8B1A1A]');
+                    });
+                    btn.classList.add('border-2', 'border-[#8B1A1A]');
+                    STATE.currentPalette = btn.dataset.palette;
+                    synthesizeSpecimen();
+                });
+            });
+
+            // Random Narrative Injection
+            DOM.randomBtn.addEventListener('click', () => {
+                const topic = NARRATIVE_TOPICS[Math.floor(Math.random() * NARRATIVE_TOPICS.length)];
+                DOM.seedInput.value = topic;
+                DOM.idLoadInput.value = '';
+                synthesizeSpecimen();
+            });
+
+            // Seed Input Debounce
+            let debounceTimer = null;
+            DOM.seedInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    DOM.idLoadInput.value = '';
+                    synthesizeSpecimen();
+                }, 350);
+            });
+
+            // Recover from ID
+            DOM.idLoadInput.addEventListener('input', () => {
+                const val = DOM.idLoadInput.value.trim();
+                if (val.length >= 6) {
+                    DOM.seedInput.value = val;
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        synthesizeSpecimen();
+                    }, 350);
+                }
+            });
+
+            // Clipboard Copy Helper
+            async function copyToClipboard(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch (e) {}
+                }
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    const success = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (success) return true;
+                } catch (e) {}
+                return false;
+            }
+
+            function buttonFeedback(buttonDom, originalHtml, successHtml) {
+                buttonDom.innerHTML = successHtml;
+                buttonDom.classList.add('border-[#8B1A1A]', 'text-[#8B1A1A]');
+                setTimeout(() => {
+                    buttonDom.innerHTML = originalHtml;
+                    buttonDom.classList.remove('border-[#8B1A1A]', 'text-[#8B1A1A]');
+                }, 2200);
+            }
+
+            // Export 1: SVG Copy & Download
+            DOM.svgBtn.addEventListener('click', async () => {
+                if (!STATE.currentSpecimen) return;
+                const dims = getDimensions(STATE.currentRatio);
+                const svgContent = window.CelestialDraw.generateSvgPlate(STATE.currentSpecimen, {
+                    width: dims.w,
+                    height: dims.h,
+                    palette: STATE.currentPalette
+                });
+
+                const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `celestial_${STATE.currentSpecimen.accessionId}_${STATE.currentSpecimen.constellation.replace(/\s+/g, '_')}.svg`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                const copied = await copyToClipboard(svgContent);
+                buttonFeedback(DOM.svgBtn, DOM.svgBtn.innerHTML, copied ? '<i class="fa-solid fa-check"></i> [ SVG SAVED ]' : '<i class="fa-solid fa-download"></i> [ DOWNLOADED ]');
+            });
+
+            // Export 2: PNG 300DPI Render
+            DOM.pngBtn.addEventListener('click', () => {
+                if (!STATE.currentSpecimen) return;
+                const origHtml = DOM.pngBtn.innerHTML;
+                DOM.pngBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> [ RENDERING ]';
+
+                const dims = getDimensions(STATE.currentRatio);
+                const scale = 2.5;
+                const canvasW = Math.round(dims.w * scale);
+                const canvasH = Math.round(dims.h * scale);
+
+                const svgMarkup = window.CelestialDraw.generateSvgPlate(STATE.currentSpecimen, {
+                    width: dims.w,
+                    height: dims.h,
+                    palette: STATE.currentPalette
+                });
+
+                const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvasW;
+                    canvas.height = canvasH;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvasW, canvasH);
+                    URL.revokeObjectURL(url);
+
+                    const pngUrl = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = pngUrl;
+                    a.download = `celestial_${STATE.currentSpecimen.accessionId}_${STATE.currentSpecimen.constellation.replace(/\s+/g, '_')}.png`;
+                    a.click();
+
+                    buttonFeedback(DOM.pngBtn, origHtml, '<i class="fa-solid fa-check"></i> [ PNG SAVED ]');
+                };
+                img.src = url;
+            });
+
+            // Embed Modal Functions
+            function showEmbedModal(code) {
+                DOM.embedModalTextarea.value = code;
+                DOM.embedModal.classList.remove('hidden');
+                DOM.embedModal.classList.add('flex');
+                DOM.embedModalTextarea.focus();
+                DOM.embedModalTextarea.select();
+            }
+
+            function hideEmbedModal() {
+                DOM.embedModal.classList.add('hidden');
+                DOM.embedModal.classList.remove('flex');
+            }
+
+            DOM.embedModalClose.addEventListener('click', hideEmbedModal);
+            DOM.embedModal.addEventListener('click', (e) => {
+                if (e.target === DOM.embedModal) hideEmbedModal();
+            });
+            DOM.embedModalCopyBtn.addEventListener('click', async () => {
+                await copyToClipboard(DOM.embedModalTextarea.value);
+                buttonFeedback(DOM.embedModalCopyBtn, DOM.embedModalCopyBtn.innerHTML, '<i class="fa-solid fa-check"></i> [ COPIED ]');
+            });
+
+            DOM.embedBtn.addEventListener('click', async () => {
+                const ratio = STATE.currentRatio;
+                const dims = getDimensions(ratio);
+                const baseUrl = window.location.origin + window.location.pathname;
+                let query = `?mode=embed`;
+                if (DOM.idLoadInput.value.trim()) query += `&id=${encodeURIComponent(DOM.idLoadInput.value.trim())}`;
+                else if (DOM.seedInput.value.trim()) query += `&narrative=${encodeURIComponent(DOM.seedInput.value.trim())}`;
+                query += `&w=${ratio.w}&h=${ratio.h}&palette=${STATE.currentPalette}`;
+
+                const embedUrl = `${baseUrl}${query}`;
+                const iframeCode = `<iframe src="${embedUrl}" width="${dims.w}" height="${dims.h}" frameborder="0" style="border:1px solid #DDD5C5; border-radius:4px;" title="Celestial Vault // ${STATE.currentSpecimen ? STATE.currentSpecimen.constellation : 'Astrometry'}"></iframe>`;
+
+                const copied = await copyToClipboard(iframeCode);
+                if (copied) {
+                    buttonFeedback(DOM.embedBtn, DOM.embedBtn.innerHTML, '<i class="fa-solid fa-check"></i> [ EMBED_CODE_COPIED ]');
+                } else {
+                    showEmbedModal(iframeCode);
+                }
+            });
+
+            // Fullscreen Viewer Functions
+            DOM.fullscreenBtn.addEventListener('click', () => {
+                if (!STATE.currentSpecimen) return;
+                const svgElement = DOM.target.querySelector('svg');
+                if (!svgElement) return;
+
+                DOM.viewerTitle.textContent = `SPECIMEN PLATE // ${STATE.currentSpecimen.constellation.toUpperCase()}`;
+                DOM.viewerSeq.textContent = `ACCESSION: ${STATE.currentSpecimen.accessionId} | PTR: ${STATE.currentSpecimen.metrics.hashHex}`;
+
+                const svgClone = svgElement.cloneNode(true);
+                svgClone.removeAttribute('width');
+                svgClone.removeAttribute('height');
+                svgClone.style.maxWidth = '100%';
+                svgClone.style.maxHeight = '100%';
+                svgClone.style.width = 'auto';
+                svgClone.style.height = 'auto';
+                svgClone.style.objectFit = 'contain';
+
+                DOM.viewerContent.innerHTML = '';
+                DOM.viewerContent.appendChild(svgClone);
+
+                DOM.fullscreenViewer.classList.add('active');
+                DOM.fullscreenViewer.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            });
+
+            DOM.viewerClose.addEventListener('click', () => {
+                DOM.fullscreenViewer.classList.remove('active');
+                DOM.fullscreenViewer.classList.add('hidden');
+                document.body.style.overflow = '';
+            });
+
+            DOM.viewerDownloadSvg.addEventListener('click', async () => {
+                const svgEl = DOM.viewerContent.querySelector('svg');
+                if (!svgEl) return;
+                const svgContent = svgEl.outerHTML;
+                const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `celestial_${STATE.currentSpecimen.accessionId}_${STATE.currentSpecimen.constellation.replace(/\s+/g, '_')}.svg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                buttonFeedback(DOM.viewerDownloadSvg, DOM.viewerDownloadSvg.innerHTML, '<i class="fa-solid fa-check"></i> [ SAVED ]');
+            });
+
+            DOM.viewerDownloadPng.addEventListener('click', () => {
+                DOM.pngBtn.click();
+            });
+
+            // URL Search Params Initialization
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'embed') {
+                document.body.dataset.mode = 'embed';
+            }
+            if (params.get('narrative') || params.get('seed')) {
+                DOM.seedInput.value = params.get('narrative') || params.get('seed');
+            }
+            if (params.get('id')) {
+                DOM.idLoadInput.value = params.get('id');
+                DOM.seedInput.value = '';
+            }
+            if (params.get('palette')) {
+                STATE.currentPalette = params.get('palette');
+                DOM.paletteBtns.forEach(b => {
+                    b.classList.remove('border-2', 'border-[#8B1A1A]');
+                    if (b.dataset.palette === STATE.currentPalette) {
+                        b.classList.add('border-2', 'border-[#8B1A1A]');
+                    }
+                });
+            }
+            if (params.get('w') && params.get('h')) {
+                const targetW = params.get('w');
+                const targetH = params.get('h');
+                DOM.ratioBtns.forEach(btn => {
+                    btn.removeAttribute('data-active');
+                    if (btn.dataset.w === targetW && btn.dataset.h === targetH) {
+                        btn.setAttribute('data-active', 'true');
+                        STATE.currentRatio = { w: parseInt(targetW, 10), h: parseInt(targetH, 10) };
+                    }
+                });
+            }
+
+            // Synthesize initial specimen on boot
+            synthesizeSpecimen();
+
+            // PWA Service Worker Registration
+            if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').catch(err => {
+                        console.warn('SW registration bypassed:', err);
+                    });
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

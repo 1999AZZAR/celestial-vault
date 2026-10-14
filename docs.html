@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Celestial Vault Technical Documentation: Astrometric Planisphere synthesis engine, JavaScript API, stereographic projections, and vector star chart specifications.">
+    <title>Technical Documentation | Celestial Vault</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        :root {
+            --archival-bg: #EFE9DC;
+            --archival-fg: #2A2520;
+            --archival-surface: #F7F3EB;
+            --archival-accent: #8B1A1A;
+            --archival-muted: #DDD5C5;
+            --archival-meta: #7A7068;
+            --grid-color: rgba(122, 112, 104, 0.08);
+        }
+
+        body { 
+            background-color: var(--archival-bg); 
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: var(--archival-fg); 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .font-tech { 
+            font-family: 'JetBrains Mono', monospace; 
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .surface-card { 
+            background: var(--archival-surface); 
+            border: 1px solid var(--archival-muted); 
+            box-shadow: 0 4px 24px -12px rgba(42, 37, 32, 0.08);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(42, 37, 32, 0.06);
+            padding: 0.15rem 0.35rem;
+            border-radius: 2px;
+            font-size: 0.88em;
+        }
+
+        pre {
+            background: var(--archival-bg);
+            border-left: 3px solid var(--archival-accent);
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            border: 1px solid var(--archival-muted);
+            border-left-width: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex justify-center">
+    <main class="max-w-4xl w-full space-y-8 my-8">
+        
+        <!-- Header -->
+        <header class="surface-card p-6 rounded-sm border border-[var(--archival-muted)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <a href="/" class="font-tech text-[10px] text-[var(--archival-meta)] hover:text-[var(--archival-accent)] transition-colors flex items-center gap-1.5 mb-2">
+                    <i class="fa-solid fa-arrow-left text-[9px]"></i> BACK TO SYNTHESIS ENGINE
+                </a>
+                <h1 class="font-tech text-base sm:text-lg font-bold text-[var(--archival-fg)] flex items-center gap-2">
+                    <i class="fa-solid fa-compass-drafting text-[var(--archival-accent)]"></i>
+                    CELESTIAL VAULT // ARCHIVAL SPECIFICATION
+                </h1>
+                <p class="text-xs text-[var(--archival-meta)] mt-1">Mathematical models, stereographic astrometric projections, and Swiss-Archival plate formatting.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="font-tech text-[9px] px-2.5 py-1 bg-[var(--archival-bg)] border border-[var(--archival-muted)] text-[var(--archival-meta)] font-semibold">
+                    REV 1.0.0
+                </span>
+            </div>
+        </header>
+
+        <!-- 1. Architectural Overview -->
+        <section class="surface-card p-6 sm:p-8 rounded-sm space-y-4">
+            <h2 class="font-tech text-xs font-bold text-[var(--archival-accent)] tracking-wider">
+                01 // ARCHITECTURAL OVERVIEW
+            </h2>
+            <p class="text-xs leading-relaxed text-[var(--archival-fg)]">
+                <strong>Celestial Vault</strong> synthesizes 100% deterministic, vector-grade celestial star charts and stereographic planispheres adhering strictly to the Swiss-Archival standard. Drawing upon historical astrometry from Hevelius's <em>Prodromus Astronomiae</em> (1690), Bayer's <em>Uranometria</em> (1603), and Su Song's 11th-century star charts, the engine derives astronomical coordinate systems, stellar magnitudes, and constellation asterisms from input narrative seeds.
+            </p>
+            <p class="text-xs leading-relaxed text-[var(--archival-fg)]">
+                Each synthesized plate incorporates Swiss-Archival dual drafting borders, an Astrometric Scale Bar (60' Arc Rule), an Archival Vermilion Seal Chop (朱砂印章 · 星纬典藏), and an engraved Hershey simplex vector cursive Latin title.
+            </p>
+        </section>
+
+        <!-- 2. Mathematical Astrometry & Projections -->
+        <section class="surface-card p-6 sm:p-8 rounded-sm space-y-4">
+            <h2 class="font-tech text-xs font-bold text-[var(--archival-accent)] tracking-wider">
+                02 // MATHEMATICAL ASTROMETRY & PROJECTIONS
+            </h2>
+            <div class="space-y-3 text-xs text-[var(--archival-fg)]">
+                <p>The coordinate framework is constructed through the following procedural layers:</p>
+                <ul class="list-disc pl-5 space-y-2 text-[var(--archival-meta)]">
+                    <li><strong>Stereographic Planisphere:</strong> The celestial sphere is projected onto an equatorial plane with radius \(R\). Concentric circles delineate parallels of Declination at 30°, 60°, and 75° North/South.</li>
+                    <li><strong>Right Ascension Radial Meridians:</strong> 24 hour circles radiating from the celestial pole at 15° intervals, with major 30° spokes accented with fine dashed hairlines.</li>
+                    <li><strong>Astrolabe Degree Limb:</strong> A dual-ringed outer perimeter calibrated with 360 degree tick marks (major intervals at 30°, minor at 5° and 1°) and numeric angular callouts.</li>
+                    <li><strong>Ecliptic Great Ellipse:</strong> Tilted elliptical orbit crossing the celestial sphere at an obliquity of \(23.44^\circ\), deterministically rotated to match the precessional epoch.</li>
+                    <li><strong>Asterism Generation:</strong> Constellation figures are linked using a greedy minimum spanning tree (MST) heuristic combined with closed geometric loop reinforcements.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 3. JavaScript API Reference -->
+        <section class="surface-card p-6 sm:p-8 rounded-sm space-y-4">
+            <h2 class="font-tech text-xs font-bold text-[var(--archival-accent)] tracking-wider">
+                03 // JAVASCRIPT API REFERENCE
+            </h2>
+            <p class="text-xs text-[var(--archival-meta)]">The <code>CelestialDraw</code> global module exposes high-level synthesis and export primitives:</p>
+
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-tech text-[10px] text-[var(--archival-fg)] font-semibold mb-1">CelestialDraw.synthesize(seed, options)</h3>
+                    <pre><code>const specimen = CelestialDraw.synthesize("Hevelius Uranographia Constellation Study", {
+    width: 600,
+    height: 600,
+    palette: "vellum" // "vellum" | "cyanotype" | "obsidian" | "indigo" | "golden"
+});
+
+console.log(specimen.accessionId); // "CSV-38-04D9Z1"
+console.log(specimen.constellation); // "Cygnus Borealis"
+console.log(specimen.metrics.alphaMagnitude); // "0.45 mag"</code></pre>
+                </div>
+
+                <div>
+                    <h3 class="font-tech text-[10px] text-[var(--archival-fg)] font-semibold mb-1">CelestialDraw.generateSvgPlate(data, options)</h3>
+                    <pre><code>const svgString = CelestialDraw.generateSvgPlate(specimen, {
+    width: 1200,
+    height: 1200,
+    palette: "cyanotype"
+});
+// Outputs a complete standalone SVG document with borders, scale bar, and seal chop</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Embed Protocol -->
+        <section class="surface-card p-6 sm:p-8 rounded-sm space-y-4">
+            <h2 class="font-tech text-xs font-bold text-[var(--archival-accent)] tracking-wider">
+                04 // EMBEDDING PROTOCOL
+            </h2>
+            <p class="text-xs text-[var(--archival-meta)]">Embed clean, isolated plates into external applications via iframe:</p>
+            <pre><code>&lt;iframe 
+    src="https://celestial-vault.glassgallery.my.id/?mode=embed&narrative=Ptolemaic+Planisphere&palette=vellum&w=1&h=1" 
+    width="600" 
+    height="600" 
+    frameborder="0" 
+    style="border: 1px solid #DDD5C5; border-radius: 4px;"&gt;
+&lt;/iframe&gt;</code></pre>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center py-6 border-t border-[var(--archival-muted)]">
+            <p class="font-tech text-[10px] text-[var(--archival-meta)]">CELESTIAL_VAULT &copy; 2026 | AZZAR_BUDIYANTO // SWISS-ARCHIVAL STANDARD</p>
+        </footer>
+    </main>
+</body>
+</html>

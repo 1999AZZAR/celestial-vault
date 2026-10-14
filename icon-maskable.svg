@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#E8E0D0"/>
+  <!-- Safe Zone Framing -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="#2A2520" stroke-width="4"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#7A7068" stroke-width="2" stroke-dasharray="6 6"/>
+  <circle cx="256" cy="256" r="80" fill="none" stroke="#7A7068" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <!-- Crosshair Reticle -->
+  <line x1="256" y1="100" x2="256" y2="412" stroke="#7A7068" stroke-width="1.5" stroke-dasharray="6 8"/>
+  <line x1="100" y1="256" x2="412" y2="256" stroke="#7A7068" stroke-width="1.5" stroke-dasharray="6 8"/>
+  <!-- Tilted Ecliptic Ellipse -->
+  <ellipse cx="256" cy="256" rx="160" ry="110" fill="none" stroke="#8B1A1A" stroke-width="2.5" transform="rotate(-23.4 256 256)"/>
+  <!-- Constellation Asterism -->
+  <polyline points="186,210 230,180 296,204 330,278 270,320 212,300 186,210" fill="none" stroke="#2A2520" stroke-width="3.5"/>
+  <circle cx="186" cy="210" r="8" fill="#8B1A1A"/>
+  <circle cx="230" cy="180" r="7" fill="#2A2520"/>
+  <circle cx="296" cy="204" r="11" fill="#8B1A1A"/>
+  <circle cx="330" cy="278" r="7" fill="#2A2520"/>
+  <circle cx="270" cy="320" r="8" fill="#8B1A1A"/>
+  <circle cx="212" cy="300" r="6" fill="#2A2520"/>
+  <!-- Star Diffraction Spikes on Alpha Star -->
+  <line x1="276" y1="204" x2="316" y2="204" stroke="#8B1A1A" stroke-width="1.8"/>
+  <line x1="296" y1="184" x2="296" y2="224" stroke="#8B1A1A" stroke-width="1.8"/>
+</svg>
