@@ -403,8 +403,20 @@
                                 <span id="tel-asterism" class="text-[#2A2520] font-semibold truncate block">8 Nodes (9 Rays)</span>
                             </div>
                             <div>
+                                <span class="text-[#7A7068] block text-[8px]">DIFFUSE NEBULAE</span>
+                                <span id="tel-nebulae" class="text-[#2A2520] font-semibold truncate block">0 Emission Fields</span>
+                            </div>
+                            <div>
+                                <span class="text-[#7A7068] block text-[8px]">OPEN CLUSTERS</span>
+                                <span id="tel-clusters" class="text-[#2A2520] font-semibold truncate block">0 Clusters</span>
+                            </div>
+                            <div>
                                 <span class="text-[#7A7068] block text-[8px]">CATALOG POPULATION</span>
                                 <span id="tel-population" class="text-[#2A2520] font-semibold truncate block">72 Cataloged Stars</span>
+                            </div>
+                            <div>
+                                <span class="text-[#7A7068] block text-[8px]">DEEP-SKY CATALOG</span>
+                                <span id="tel-deepsky" class="text-[#2A2520] font-semibold truncate block">0 Objects</span>
                             </div>
                             <div>
                                 <span class="text-[#7A7068] block text-[8px]">PLANISPHERE PROJECTION</span>
@@ -492,7 +504,7 @@
     </main>
 
     <!-- Core Engine Scripts -->
-    <script src="js/celestialdraw.js?v=1.0.0"></script>
+    <script src="js/celestialdraw.js?v=1.2.0"></script>
     <script>
         (function() {
             const NARRATIVE_TOPICS = [
@@ -554,6 +566,9 @@
                 telMag: document.getElementById('tel-mag'),
                 telAsterism: document.getElementById('tel-asterism'),
                 telPopulation: document.getElementById('tel-population'),
+                telNebulae: document.getElementById('tel-nebulae'),
+                telClusters: document.getElementById('tel-clusters'),
+                telDeepSky: document.getElementById('tel-deepsky'),
                 telProjection: document.getElementById('tel-projection'),
                 telPrecession: document.getElementById('tel-precession'),
                 telHash: document.getElementById('tel-hash'),
@@ -611,6 +626,7 @@
             }
 
             function synthesizeSpecimen() {
+              try {
                 const t0 = performance.now();
                 const idLoadVal = DOM.idLoadInput.value.trim();
                 let seedVal = DOM.seedInput.value.trim();
@@ -644,6 +660,9 @@
                 if (DOM.telMag) DOM.telMag.textContent = specimen.metrics.alphaMagnitude;
                 if (DOM.telAsterism) DOM.telAsterism.textContent = specimen.metrics.asterismNodes;
                 if (DOM.telPopulation) DOM.telPopulation.textContent = specimen.metrics.starFieldPopulation;
+                if (DOM.telNebulae) DOM.telNebulae.textContent = specimen.metrics.nebulae;
+                if (DOM.telClusters) DOM.telClusters.textContent = specimen.metrics.clusters;
+                if (DOM.telDeepSky) DOM.telDeepSky.textContent = specimen.metrics.deepSky;
                 if (DOM.telProjection) DOM.telProjection.textContent = specimen.metrics.projection;
                 if (DOM.telPrecession) DOM.telPrecession.textContent = specimen.metrics.precessionRate;
                 if (DOM.telHash) DOM.telHash.textContent = specimen.metrics.hashHex;
@@ -669,6 +688,19 @@
                     url.searchParams.set('palette', STATE.currentPalette);
                     window.history.replaceState({}, '', url);
                 }
+              } catch (err) {
+                renderFault(err);
+              }
+            }
+
+            function renderFault(err) {
+                console.error('[CelestialDraw] synthesis fault:', err);
+                if (DOM.target) {
+                    DOM.target.innerHTML = '<div class="font-tech text-[10px] text-[#8B1A1A] text-center leading-relaxed">' +
+                        '<i class="fa-solid fa-triangle-exclamation"></i> SYNTHESIS FAULT<br>' +
+                        '<span class="text-[#7A7068]">' + (err && err.message ? err.message : 'unknown error') + '</span></div>';
+                }
+                if (DOM.hashMetric) DOM.hashMetric.textContent = 'FAULT';
             }
 
             function renderViewport() {
@@ -710,7 +742,9 @@
                     if (DOM.paletteActiveLabel) {
                         DOM.paletteActiveLabel.textContent = STATE.currentPalette.toUpperCase();
                     }
-                    synthesizeSpecimen();
+                    // Palette is a pure re-render: reuse the synthesized specimen.
+                    if (STATE.currentSpecimen) renderViewport();
+                    else synthesizeSpecimen();
                 });
             });
 

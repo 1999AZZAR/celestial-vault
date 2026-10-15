@@ -1,4 +1,4 @@
-const CACHE_NAME = 'celestial-vault-v1.0.0';
+const CACHE_NAME = 'celestial-vault-v1.2.0';
 const ASSETS = [
   '/',
   '/index.html',
@@ -6,7 +6,7 @@ const ASSETS = [
   '/icon-192.svg',
   '/icon-512.svg',
   '/icon-maskable.svg',
-  '/js/celestialdraw.js?v=1.0.0',
+  '/js/celestialdraw.js?v=1.2.0',
   '/docs.html',
   'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',

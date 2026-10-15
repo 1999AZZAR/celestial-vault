@@ -342,6 +342,8 @@
         mag: mag,
         isPrimary: true,
         bayer: BAYER_GREEK[i] || "",
+        kind: "primary",
+        double: i > 0 && rng() > 0.82,
         id: i
       });
     }
@@ -359,7 +361,87 @@
         mag: fMag,
         isPrimary: false,
         bayer: "",
+        kind: "field",
+        variable: rng() > 0.9,
         id: primaryStarCount + f
+      });
+    }
+
+    // 1b. Milky Way Galactic Dust Lane (gaussian-scattered faint micro-stars)
+    var bandAngle = rng() * Math.PI;
+    var bandWidth = celestialRadius * (0.16 + rng() * 0.13);
+    var dustTarget = 110 + Math.floor(rng() * 90);
+    var dustStars = [];
+    for (var mk = 0; mk < dustTarget; mk++) {
+      var along = (rng() - 0.5) * celestialRadius * 2.05;
+      var off = ((rng() + rng() + rng()) - 1.5) / 1.5 * bandWidth;
+      var bx = cx + Math.cos(bandAngle) * along - Math.sin(bandAngle) * off;
+      var by = cy + Math.sin(bandAngle) * along + Math.cos(bandAngle) * off;
+      var bd = Math.hypot(bx - cx, by - cy);
+      if (bd > celestialRadius * 0.985) continue;
+      var dustStar = {
+        x: bx, y: by, mag: 4.9 + rng() * 1.8,
+        isPrimary: false, bayer: "", kind: "dust", id: stars.length + dustStars.length
+      };
+      stars.push(dustStar);
+      dustStars.push(dustStar);
+    }
+
+    // 1c. Open Star Clusters (tight gravitationally-bound asterisms)
+    var clusterCount = 1 + Math.floor(rng() * 3);
+    var clusters = [];
+    for (var c = 0; c < clusterCount; c++) {
+      var cAngle = rng() * Math.PI * 2;
+      var cDist = Math.sqrt(rng()) * celestialRadius * 0.82;
+      var cCx = cx + Math.cos(cAngle) * cDist;
+      var cCy = cy + Math.sin(cAngle) * cDist;
+      var cR = celestialRadius * (0.06 + rng() * 0.06);
+      var cMembers = 7 + Math.floor(rng() * 11);
+      for (var g = 0; g < cMembers; g++) {
+        var ga = rng() * Math.PI * 2;
+        var gd = Math.sqrt(rng()) * cR;
+        stars.push({
+          x: cCx + Math.cos(ga) * gd, y: cCy + Math.sin(ga) * gd,
+          mag: 4.2 + rng() * 1.6, isPrimary: false, bayer: "",
+          kind: "cluster", clusterId: c, id: stars.length
+        });
+      }
+      clusters.push({ x: cCx, y: cCy, r: cR * 1.35, members: cMembers, label: "OCL-" + (100 + Math.floor(rng() * 899)) });
+    }
+
+    // 1d. Diffuse Nebulae (soft emission fields drawn as gradient discs)
+    var nebulaCount = 2 + Math.floor(rng() * 3);
+    var nebulae = [];
+    for (var nb = 0; nb < nebulaCount; nb++) {
+      var nAngle = rng() * Math.PI * 2;
+      var nDist = Math.sqrt(rng()) * celestialRadius * 0.72;
+      nebulae.push({
+        x: cx + Math.cos(nAngle) * nDist,
+        y: cy + Math.sin(nAngle) * nDist,
+        r: celestialRadius * (0.10 + rng() * 0.14),
+        intensity: 0.10 + rng() * 0.10,
+        accent: rng() > 0.45
+      });
+    }
+
+    // 1e. Deep-Sky Object Markers (galaxies, globulars, planetary nebulae)
+    var DSO_TYPES = ["galaxy", "globular", "planetary", "open"];
+    var dsoCount = 2 + Math.floor(rng() * 3);
+    var deepSkyObjects = [];
+    for (var dso = 0; dso < dsoCount; dso++) {
+      var dAngle = rng() * Math.PI * 2;
+      var dDist = Math.sqrt(rng()) * celestialRadius * 0.9;
+      var dType = DSO_TYPES[Math.floor(rng() * DSO_TYPES.length)];
+      var catalog = rng() > 0.5
+        ? "M" + (1 + Math.floor(rng() * 109))
+        : "NGC " + (200 + Math.floor(rng() * 7600));
+      deepSkyObjects.push({
+        x: cx + Math.cos(dAngle) * dDist,
+        y: cy + Math.sin(dAngle) * dDist,
+        r: Math.max(3, celestialRadius * (0.014 + rng() * 0.012)),
+        type: dType,
+        catalog: catalog,
+        magnitude: (7 + rng() * 4).toFixed(1)
       });
     }
 
@@ -404,6 +486,20 @@
       asterismEdges.push([pC, pD]);
     }
 
+    // 2b. Constellation Boundary Region (angular-ordered asterism hull)
+    var regionPolygon = null;
+    if (primaries.length >= 4) {
+      var cxn = 0, cyn = 0;
+      for (var pi = 0; pi < primaries.length; pi++) { cxn += primaries[pi].x; cyn += primaries[pi].y; }
+      cxn /= primaries.length; cyn /= primaries.length;
+      var orderedPrimaries = primaries.slice().sort(function (a, b) {
+        return Math.atan2(a.y - cyn, a.x - cxn) - Math.atan2(b.y - cyn, b.x - cxn);
+      });
+      regionPolygon = orderedPrimaries.map(function (s) {
+        return s.x.toFixed(2) + "," + s.y.toFixed(2);
+      }).join(" ");
+    }
+
     // 3. Ecliptic & Precessional Ring Angles
     var eclipticTilt = 23.44 * (Math.PI / 180);
     var eclipticRotation = rng() * Math.PI * 2;
@@ -415,6 +511,7 @@
     var raMin = Math.floor(rng() * 60);
     var raSec = Math.floor(rng() * 60);
     var decDeg = (rng() > 0.35 ? "+" : "-") + Math.floor(rng() * 88);
+    var decMin = Math.floor(rng() * 60);
     var DESCRIPTORS = [
       "Boreal planisphere of stellar asterisms & radiant nodes",
       "Austral circumpolar planisphere & astrolabe meridian grid",
@@ -441,7 +538,12 @@
       starFieldPopulation: stars.length + " Cataloged Stars",
       projection: "Stereographic Planisphere (1:60' Arc)",
       precessionRate: "+50.29\" / Century",
-      celestialRadius: celestialRadius
+      celestialRadius: celestialRadius,
+      nebulae: nebulae.length + (nebulae.length === 1 ? " Emission Field" : " Emission Fields"),
+      clusters: clusters.length + (clusters.length === 1 ? " Open Cluster" : " Open Clusters") +
+        " (" + clusters.reduce(function (a, cx2) { return a + cx2.members; }, 0) + " Members)",
+      deepSky: deepSkyObjects.length + " Deep-Sky Objects",
+      dustLane: dustStars.length + " Galactic Dust Stars"
     };
 
     return {
@@ -451,6 +553,13 @@
       constellation: constellationName,
       stars: stars,
       asterismEdges: asterismEdges,
+      regionPolygon: regionPolygon,
+      nebulae: nebulae,
+      clusters: clusters,
+      deepSkyObjects: deepSkyObjects,
+      bandAngle: bandAngle,
+      bandWidth: bandWidth,
+      dustStars: dustStars,
       cx: cx,
       cy: cy,
       celestialRadius: celestialRadius,
@@ -509,6 +618,73 @@
     var textOut = putHersheyText(data.constellation);
     var cursiveX = Math.round((width - textOut[0] * cursiveScale) / 2);
     var hersheySvgPaths = hersheyToSvgPaths(data.constellation, cursiveX, cursiveY, cursiveScale);
+
+    var microFontSize = Math.max(5, Math.round(6 * scaleFactor));
+
+    // --- Build Diffuse Galactic Band & Nebular Emission Fields ---
+    var defs = [];
+    defs.push('<linearGradient id="mwLane" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + metaColor + '" stop-opacity="0" />' +
+      '<stop offset="50%" stop-color="' + metaColor + '" stop-opacity="0.16" />' +
+      '<stop offset="100%" stop-color="' + metaColor + '" stop-opacity="0" />' +
+      '</linearGradient>');
+
+    var bandElements = [];
+    if (data.bandWidth && data.celestialRadius) {
+      var bandRot = ((data.bandAngle * 180) / Math.PI).toFixed(2);
+      bandElements.push('<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + Number(data.celestialRadius).toFixed(2) +
+        '" ry="' + Number(data.bandWidth).toFixed(2) + '" fill="url(#mwLane)" transform="rotate(' + bandRot + ' ' + cx + ' ' + cy + ')" opacity="0.9" />');
+    }
+
+    var nebulaElements = [];
+    var nebulaList = data.nebulae || [];
+    for (var ni = 0; ni < nebulaList.length; ni++) {
+      var neb = nebulaList[ni];
+      var nebColor = neb.accent ? p.accent : metaColor;
+      defs.push('<radialGradient id="neb' + ni + '" cx="50%" cy="50%" r="50%">' +
+        '<stop offset="0%" stop-color="' + nebColor + '" stop-opacity="' + neb.intensity.toFixed(2) + '" />' +
+        '<stop offset="55%" stop-color="' + nebColor + '" stop-opacity="' + (neb.intensity * 0.4).toFixed(2) + '" />' +
+        '<stop offset="100%" stop-color="' + nebColor + '" stop-opacity="0" />' +
+        '</radialGradient>');
+      nebulaElements.push('<circle cx="' + neb.x.toFixed(2) + '" cy="' + neb.y.toFixed(2) + '" r="' + neb.r.toFixed(2) + '" fill="url(#neb' + ni + ')" />');
+    }
+
+    // --- Constellation Boundary Region (subtle vermilion enclosure) ---
+    var regionElements = [];
+    if (data.regionPolygon) {
+      regionElements.push('<polygon points="' + data.regionPolygon + '" fill="' + p.accent + '" fill-opacity="0.05" stroke="' + p.accent + '" stroke-width="0.5" stroke-dasharray="4 5" opacity="0.75" />');
+    }
+
+    // --- Open Cluster Enclosures & Catalog Tags ---
+    var clusterElements = [];
+    var clusterList = data.clusters || [];
+    for (var ci = 0; ci < clusterList.length; ci++) {
+      var cl = clusterList[ci];
+      clusterElements.push('<circle cx="' + cl.x.toFixed(2) + '" cy="' + cl.y.toFixed(2) + '" r="' + cl.r.toFixed(2) + '" fill="none" stroke="' + metaColor + '" stroke-width="0.4" stroke-dasharray="2 3" opacity="0.6" />');
+      clusterElements.push('<text x="' + (cl.x + cl.r + 2).toFixed(2) + '" y="' + (cl.y + 2).toFixed(2) + '" font-family="\'JetBrains Mono\', monospace" font-size="' + microFontSize + '" fill="' + metaColor + '" opacity="0.85">' + cl.label + '</text>');
+    }
+
+    // --- Deep-Sky Object Markers (galaxy / globular / planetary / open) ---
+    var dsoElements = [];
+    var dsoList = data.deepSkyObjects || [];
+    for (var di = 0; di < dsoList.length; di++) {
+      var o = dsoList[di];
+      var orx = o.x.toFixed(2);
+      var ory = o.y.toFixed(2);
+      var orr = o.r.toFixed(2);
+      if (o.type === "galaxy") {
+        dsoElements.push('<ellipse cx="' + orx + '" cy="' + ory + '" rx="' + (o.r * 1.6).toFixed(2) + '" ry="' + (o.r * 0.8).toFixed(2) + '" fill="none" stroke="' + p.accent + '" stroke-width="0.6" opacity="0.85" />');
+      } else if (o.type === "globular") {
+        dsoElements.push('<circle cx="' + orx + '" cy="' + ory + '" r="' + orr + '" fill="none" stroke="' + p.accent + '" stroke-width="0.6" opacity="0.85" />');
+        dsoElements.push('<line x1="' + (o.x - o.r * 1.5).toFixed(2) + '" y1="' + ory + '" x2="' + (o.x + o.r * 1.5).toFixed(2) + '" y2="' + ory + '" stroke="' + p.accent + '" stroke-width="0.4" opacity="0.6" />');
+      } else if (o.type === "planetary") {
+        dsoElements.push('<circle cx="' + orx + '" cy="' + ory + '" r="' + (o.r * 0.7).toFixed(2) + '" fill="none" stroke="' + p.accent + '" stroke-width="0.8" opacity="0.9" />');
+        dsoElements.push('<circle cx="' + orx + '" cy="' + ory + '" r="1" fill="' + p.accent + '" />');
+      } else {
+        dsoElements.push('<circle cx="' + orx + '" cy="' + ory + '" r="' + orr + '" fill="none" stroke="' + p.accent + '" stroke-width="0.5" stroke-dasharray="1.5 2.5" opacity="0.85" />');
+      }
+      dsoElements.push('<text x="' + (o.x + o.r + 2.5).toFixed(2) + '" y="' + (o.y + o.r + 3).toFixed(2) + '" font-family="\'JetBrains Mono\', monospace" font-size="' + microFontSize + '" fill="' + p.accent + '" opacity="0.9">' + o.catalog + '</text>');
+    }
 
     // --- Build Armillary / Astrolabe Coordinate Rings ---
     var coordinateRings = [];
@@ -581,32 +757,52 @@
     var bayerFontSize = Math.max(7, Math.round(8.5 * scaleFactor));
     for (var s = 0; s < data.stars.length; s++) {
       var star = data.stars[s];
+      var sx2 = star.x.toFixed(2);
+      var sy2 = star.y.toFixed(2);
+
+      // Milky Way dust micro-stars: tiny, uniform, faint
+      if (star.kind === "dust") {
+        starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + (0.4 + (6 - star.mag) * 0.12).toFixed(2) + '" fill="' + strokeColor + '" opacity="0.32" />');
+        continue;
+      }
+      // Cluster members: compact bright dots inside enclosures
+      if (star.kind === "cluster") {
+        starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + Math.max(0.5, (4.2 - star.mag * 0.6) * scaleFactor).toFixed(2) + '" fill="' + strokeColor + '" opacity="0.8" />');
+        continue;
+      }
+
       var baseR = Math.max(0.6, (5.5 - star.mag * 0.72) * scaleFactor);
 
       if (star.isPrimary) {
         // Prominent Constellation Star with Astrometric Halo
-        var haloR = (baseR * 2.2).toFixed(2);
-        starElements.push('<circle cx="' + star.x.toFixed(2) + '" cy="' + star.y.toFixed(2) + '" r="' + haloR + '" fill="' + p.starHalo + '" />');
-        
+        starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + (baseR * 2.2).toFixed(2) + '" fill="' + p.starHalo + '" />');
+
         // 4-Point Starlight Diffraction Spikes for 1st Magnitude (Alpha) Stars
         if (star.mag < 1.2) {
-          var spLen = (baseR * 3.4).toFixed(2);
-          starElements.push('<line x1="' + (star.x - spLen).toFixed(2) + '" y1="' + star.y.toFixed(2) + '" x2="' + (star.x + parseFloat(spLen)).toFixed(2) + '" y2="' + star.y.toFixed(2) + '" stroke="' + strokeColor + '" stroke-width="0.5" opacity="0.75" />');
-          starElements.push('<line x1="' + star.x.toFixed(2) + '" y1="' + (star.y - spLen).toFixed(2) + '" x2="' + star.x.toFixed(2) + '" y2="' + (star.y + parseFloat(spLen)).toFixed(2) + '" stroke="' + strokeColor + '" stroke-width="0.5" opacity="0.75" />');
+          var spLen = baseR * 3.4;
+          starElements.push('<line x1="' + (star.x - spLen).toFixed(2) + '" y1="' + sy2 + '" x2="' + (star.x + spLen).toFixed(2) + '" y2="' + sy2 + '" stroke="' + strokeColor + '" stroke-width="0.5" opacity="0.75" />');
+          starElements.push('<line x1="' + sx2 + '" y1="' + (star.y - spLen).toFixed(2) + '" x2="' + sx2 + '" y2="' + (star.y + spLen).toFixed(2) + '" stroke="' + strokeColor + '" stroke-width="0.5" opacity="0.75" />');
         }
 
         // Star Core Disc
-        starElements.push('<circle cx="' + star.x.toFixed(2) + '" cy="' + star.y.toFixed(2) + '" r="' + baseR.toFixed(2) + '" fill="' + p.starAlpha + '" stroke="' + strokeColor + '" stroke-width="0.5" />');
+        starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + baseR.toFixed(2) + '" fill="' + p.starAlpha + '" stroke="' + strokeColor + '" stroke-width="0.5" />');
+
+        // Double-star companion notation
+        if (star.double) {
+          starElements.push('<circle cx="' + (star.x + baseR * 2.1).toFixed(2) + '" cy="' + sy2 + '" r="' + (baseR * 0.55).toFixed(2) + '" fill="' + strokeColor + '" opacity="0.85" />');
+        }
 
         // Bayer Designation Annotation
         if (star.bayer) {
-          var tx = (star.x + baseR + 3).toFixed(2);
-          var ty = (star.y - baseR - 1).toFixed(2);
-          starElements.push('<text x="' + tx + '" y="' + ty + '" font-family="\'Noto Serif SC\', serif" font-style="italic" font-size="' + bayerFontSize + '" fill="' + p.accent + '">' + star.bayer + '</text>');
+          starElements.push('<text x="' + (star.x + baseR + 3).toFixed(2) + '" y="' + (star.y - baseR - 1).toFixed(2) + '" font-family="\'Noto Serif SC\', serif" font-style="italic" font-size="' + bayerFontSize + '" fill="' + p.accent + '">' + star.bayer + '</text>');
         }
       } else {
         // Field Star Point
-        starElements.push('<circle cx="' + star.x.toFixed(2) + '" cy="' + star.y.toFixed(2) + '" r="' + baseR.toFixed(2) + '" fill="' + strokeColor + '" opacity="' + (star.mag > 4.5 ? '0.45' : '0.75') + '" />');
+        starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + baseR.toFixed(2) + '" fill="' + strokeColor + '" opacity="' + (star.mag > 4.5 ? '0.45' : '0.75') + '" />');
+        // Variable-star open-circle notation
+        if (star.variable) {
+          starElements.push('<circle cx="' + sx2 + '" cy="' + sy2 + '" r="' + (baseR + 1.4).toFixed(2) + '" fill="none" stroke="' + p.accent + '" stroke-width="0.4" opacity="0.7" />');
+        }
       }
     }
 
@@ -620,8 +816,17 @@
     var lines = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' + width + ' ' + height + '" width="' + width + '" height="' + height + '">',
+      '  <defs>',
+      '    ' + defs.join('\n    '),
+      '  </defs>',
       '  <!-- Archival Astrometry Vellum Plate -->',
       '  <rect width="100%" height="100%" fill="' + p.paper + '" />',
+      '',
+      '  <!-- Diffuse Galactic Band & Nebular Emission Fields -->',
+      '  <g class="diffuse-field">',
+      '    ' + bandElements.join('\n    '),
+      '    ' + nebulaElements.join('\n    '),
+      '  </g>',
       '',
       '  <!-- Archival Drafting Borders (Swiss-Archival Standard) -->',
       '  <rect x="' + margin + '" y="' + margin + '" width="' + (width - margin * 2) + '" height="' + (height - margin * 2) + '" fill="none" stroke="' + strokeColor + '" stroke-width="' + outerLineWidth.toFixed(2) + '" />',
@@ -636,9 +841,24 @@
       '    ' + centerReticle,
       '  </g>',
       '',
+      '  <!-- Constellation Boundary Region -->',
+      '  <g class="constellation-region">',
+      '    ' + regionElements.join('\n    '),
+      '  </g>',
+      '',
       '  <!-- Constellation Asterism Vectors -->',
       '  <g class="constellation-asterism">',
       '    ' + asterismLines.join('\n    '),
+      '  </g>',
+      '',
+      '  <!-- Open Cluster Enclosures -->',
+      '  <g class="open-clusters">',
+      '    ' + clusterElements.join('\n    '),
+      '  </g>',
+      '',
+      '  <!-- Deep-Sky Object Catalog -->',
+      '  <g class="deep-sky">',
+      '    ' + dsoElements.join('\n    '),
       '  </g>',
       '',
       '  <!-- Stellar Catalog & Magnitude Hierarchy -->',
