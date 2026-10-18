@@ -505,6 +505,7 @@
 
     <!-- Core Engine Scripts -->
     <script src="js/celestialdraw.js?v=1.2.0"></script>
+    <script src="js/generational-cache.js?v=1.0.0"></script>
     <script>
         (function() {
             const NARRATIVE_TOPICS = [
@@ -625,32 +626,7 @@
                 }
             }
 
-            function synthesizeSpecimen() {
-              try {
-                const t0 = performance.now();
-                const idLoadVal = DOM.idLoadInput.value.trim();
-                let seedVal = DOM.seedInput.value.trim();
-                const dims = getDimensions(STATE.currentRatio);
-
-                let opts = {
-                    width: dims.w,
-                    height: dims.h,
-                    palette: STATE.currentPalette
-                };
-
-                if (idLoadVal && idLoadVal.includes('-')) {
-                    opts.id = idLoadVal;
-                    STATE.currentSeed = idLoadVal;
-                } else {
-                    seedVal = seedVal || 'Archival Astrometric Specimen';
-                    opts.narrative = seedVal;
-                    STATE.currentSeed = seedVal;
-                }
-
-                const specimen = window.CelestialDraw.synthesize(opts.narrative || opts.id, opts);
-                STATE.currentSpecimen = specimen;
-
-                // Update Telemetry Panel
+            function applyTelemetry(specimen, tElapsed, isCached) {
                 if (DOM.accessionBadge) DOM.accessionBadge.textContent = specimen.accessionId;
                 if (DOM.specimenId) DOM.specimenId.textContent = `SEQ: ${specimen.accessionId}`;
                 if (DOM.telConstellation) DOM.telConstellation.textContent = specimen.constellation;
@@ -665,12 +641,67 @@
                 if (DOM.telDeepSky) DOM.telDeepSky.textContent = specimen.metrics.deepSky;
                 if (DOM.telProjection) DOM.telProjection.textContent = specimen.metrics.projection;
                 if (DOM.telPrecession) DOM.telPrecession.textContent = specimen.metrics.precessionRate;
-                if (DOM.telHash) DOM.telHash.textContent = specimen.metrics.hashHex;
+                const cacheTag = isCached ? ' [GEN_CACHE]' : '';
+                if (DOM.telHash) DOM.telHash.textContent = `${specimen.metrics.hashHex}${cacheTag}`;
 
-                const tElapsed = (performance.now() - t0).toFixed(1);
-                if (DOM.hashMetric) DOM.hashMetric.textContent = `${tElapsed}MS // ${specimen.stars.length} STARS`;
+                if (DOM.hashMetric) DOM.hashMetric.textContent = `${tElapsed.toFixed(1)}MS // ${specimen.stars ? specimen.stars.length : 0} STARS${cacheTag}`;
+            }
 
+            async function synthesizeSpecimen() {
+              try {
+                const t0 = performance.now();
+                const idLoadVal = DOM.idLoadInput.value.trim();
+                let seedVal = DOM.seedInput.value.trim();
+                const dims = getDimensions(STATE.currentRatio);
+
+                let opts = {
+                    width: dims.w,
+                    height: dims.h,
+                    palette: STATE.currentPalette
+                };
+
+                let keySeed;
+                if (idLoadVal && idLoadVal.includes('-')) {
+                    opts.id = idLoadVal;
+                    STATE.currentSeed = idLoadVal;
+                    keySeed = idLoadVal;
+                } else {
+                    seedVal = seedVal || 'Archival Astrometric Specimen';
+                    opts.narrative = seedVal;
+                    STATE.currentSeed = seedVal;
+                    keySeed = seedVal;
+                }
+
+                const cacheKey = typeof GenerationalCache !== 'undefined'
+                    ? GenerationalCache.makeKey('CV', keySeed, STATE.currentRatio.w, STATE.currentRatio.h, STATE.currentPalette, 'static')
+                    : null;
+
+                if (cacheKey) {
+                    const cached = await GenerationalCache.get(cacheKey);
+                    if (cached && cached.specimen && cached.svg) {
+                        STATE.currentSpecimen = cached.specimen;
+                        DOM.target.innerHTML = cached.svg;
+                        const svgEl = DOM.target.querySelector('svg');
+                        if (svgEl) {
+                            svgEl.style.aspectRatio = `${dims.w} / ${dims.h}`;
+                            svgEl.classList.add('w-full', 'h-full', 'max-h-[500px]', 'object-contain', 'transition-all');
+                        }
+                        applyTelemetry(cached.specimen, performance.now() - t0, true);
+                        return;
+                    }
+                }
+
+                const specimen = window.CelestialDraw.synthesize(opts.narrative || opts.id, opts);
+                STATE.currentSpecimen = specimen;
+                applyTelemetry(specimen, performance.now() - t0, false);
                 renderViewport();
+
+                if (cacheKey && typeof GenerationalCache !== 'undefined') {
+                    GenerationalCache.set(cacheKey, {
+                        specimen: specimen,
+                        svg: DOM.target.innerHTML
+                    });
+                }
 
                 // Sync URL if not in embed mode
                 if (document.body.dataset.mode !== 'embed') {
